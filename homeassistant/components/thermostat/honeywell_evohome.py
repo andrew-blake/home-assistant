@@ -13,7 +13,7 @@ from homeassistant.const import (CONF_USERNAME, CONF_PASSWORD, TEMP_CELCIUS)
 from evohomeclient2 import EvohomeClient
 from datetime import datetime, timedelta
 
-REQUIREMENTS = ['evohomeclient==0.2.3']
+REQUIREMENTS = ['evohomeclient==0.2.4']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class EvohomeClientSingleton(object):
         print("EvohomeClientSingleton: last_refresh: %s, %s" % (self._last_refresh, (self._last_refresh is not None and (datetime.utcnow() - self._last_refresh) > timedelta(seconds=20))))
         if not self._initialised or force_refresh or (self._last_refresh is not None and (datetime.utcnow() - self._last_refresh) > timedelta(seconds=60 * 5)):
             temperatures = {}
-            for t in self._api.temperatures(force_refresh=force_refresh):
+            for t in self._api.temperatures():
                 name = t['name']
                 print("EvohomeClientSingleton: %s, %s" % (name, t))
                 temperatures[name] = t
