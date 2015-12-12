@@ -17,6 +17,11 @@ REQUIREMENTS = ['evohomeclient==0.2.4']
 
 _LOGGER = logging.getLogger(__name__)
 
+class EvohomeInitException(Exception):
+    pass
+
+class EvohomeRefreshException(Exception):
+    pass
 
 class EvohomeClientSingleton(object):
 
@@ -24,6 +29,7 @@ class EvohomeClientSingleton(object):
     _api = None
     _username = None
     _password = None
+    _debug = None
     _room_temperatures = {}
     _initialised = False
     _last_refresh = None
@@ -31,16 +37,28 @@ class EvohomeClientSingleton(object):
     def __init__(self):
         self.__dict__ = self.__shared_state
 
+    def _init_login(self):
+
+        self._api = EvohomeClient(self._username, self._password, debug=self._debug)
+        if self._api is None:
+            # failed to initialise, but let's back off to let API server recover
+            self._initialised = False
+            self._last_refresh = datetime.utcnow()
+            raise EvohomeInitException()
+
     def init(self, username, password, debug=False):
         if not self._initialised:
             self._username = username
             self._password = password
-            self._api = EvohomeClient(username, password, debug=debug)
+            self._debug = debug
             self.refresh_temps()
 
     def refresh_temps(self, force_refresh=False):
         # print("EvohomeClientSingleton: self._initialised: %s" % self._initialised)
         # print("EvohomeClientSingleton: force_refresh:    %s" % force_refresh)
+        if not self._initialised:
+            self._init_login()
+
         print("EvohomeClientSingleton: last_refresh: %s, %s" % (self._last_refresh, (self._last_refresh is not None and (datetime.utcnow() - self._last_refresh) > timedelta(seconds=20))))
         if not self._initialised or force_refresh or (self._last_refresh is not None and (datetime.utcnow() - self._last_refresh) > timedelta(seconds=60 * 5)):
             temperatures = {}
@@ -62,7 +80,7 @@ class EvohomeClientSingleton(object):
         except Exception as e:
             self._initialised = False
             print(e)
-            return None
+            raise EvohomeRefreshException()
 
     def set_temperature(self, room, temp):
         """Not implemented"""
@@ -131,7 +149,7 @@ class EvohomeThermostat(ThermostatDevice):
     def update(self):
         try:
             data = self.device.room_temperature(room=self._room)
-        except StopIteration:
+        except Exception:
             _LOGGER.error("Did not receive any temperature data from the "
                           "evohomeclient API.")
             return
